@@ -37,6 +37,7 @@ export default function Game() {
     };
   }, [handleKeyDown]);
 
+  // Functionality for cell hovering before placement
   const [hoveredCell, setHoveredCell] = useState({ row: -1, col: -1 });
 
   type hoveredCell = {
@@ -55,7 +56,7 @@ export default function Game() {
     destroyer: 2,
   };
 
-  // Function to place a ship
+  // Functionality to place a ship
   const placeShip = (isPlayerBoard: boolean, ship: keyof typeof ships, row: number, col: number, isVertical: boolean) => {
     // Check if ship can be placed
     const shipSize = ships[ship];

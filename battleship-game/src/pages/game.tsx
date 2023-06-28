@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 export default function Game() {
   // Initialize game state
@@ -12,16 +12,42 @@ export default function Game() {
       submarine: 1,
       destroyer: 1,
     },
+    computerShips: {
+      carrier: 1,
+      battleship: 1,
+      cruiser: 1,
+      submarine: 1,
+      destroyer: 1,
+    },
     currentPlayer: "player",
     gameOver: false,
+    playerScore: 0,
+    computerScore: 0,
+    round: 1,
   });
 
   interface GameState {
+    currentPlayer: 'player' | 'computer';
+    gameOver: boolean;
+    playerScore: number;
+    computerScore: number;
+    round: number;
     playerBoard: number[][];
     computerBoard: number[][];
-    availableShips: Record<string, number>;
-    currentPlayer: string;
-    gameOver: boolean;
+    availableShips: { 
+      carrier: number;
+      battleship: number;
+      cruiser: number;
+      submarine: number;
+      destroyer: number;
+    };
+    computerShips: { 
+      carrier: number;
+      battleship: number;
+      cruiser: number;
+      submarine: number;
+      destroyer: number;
+    };
   }
 
   // Functionality for rotating ships
@@ -42,7 +68,6 @@ export default function Game() {
     };
   }, [handleKeyDown]);
 
-  // Functionality for cell hovering before placement
   const [hoveredCell, setHoveredCell] = useState({ row: -1, col: -1 });
 
   type hoveredCell = {
@@ -53,72 +78,46 @@ export default function Game() {
   const [currentShip, setCurrentShip] = useState<keyof typeof ships | null>(null);
 
   // Ship definitions with their sizes
-  const ships = {
+  const ships = useMemo(() => ({
     carrier: 5,
     battleship: 4,
     cruiser: 3,
     submarine: 3,
     destroyer: 2,
-  };
+  }), []);
 
-  // Functionality to place a ship
-  const placeShip = (isPlayerBoard: boolean, ship: keyof typeof ships, row: number, col: number, isVertical: boolean) => {
-    // Check if ship can be placed
+  const placeShip = useCallback((board: number[][], ship: keyof typeof ships, row: number, col: number, isVertical: boolean) => {
     const shipSize = ships[ship];
-    if (gameState.availableShips[ship] <= 0) {
-      alert('No more ships of this type available.');
-      return;
-    }
-  
-    const board = isPlayerBoard ? gameState.playerBoard : gameState.computerBoard;
-    const newBoard = isPlayerBoard ? [...gameState.playerBoard] : [...gameState.computerBoard];
-  
-    // Check if the ship can be placed vertically
-    if (isVertical && row + shipSize <= 10) {
-      for (let i = 0; i < shipSize; i++) {
-        if (board[row + i][col] !== 0) {
-          alert('Ship cannot be placed here.');
-          return;
-        }
-      }
-  
-      // Place the ship vertically
-      for (let i = 0; i < shipSize; i++) {
-        newBoard[row + i][col] = 1;
-      }
-    }
-    // Check if the ship can be placed horizontally
-    else if (!isVertical && col + shipSize <= 10) {
-      for (let i = 0; i < shipSize; i++) {
-        if (board[row][col + i] !== 0) {
-          alert('Ship cannot be placed here.');
-          return;
-        }
-      }
-  
-      // Place the ship horizontally
-      for (let i = 0; i < shipSize; i++) {
-        newBoard[row][col + i] = 1;
-      }
-    } else {
-      alert('Ship cannot be placed here.');
-      return;
-    }
-  
-    // Decrease available ships count
-    const newAvailableShips = { ...gameState.availableShips };
-    newAvailableShips[ship] -= 1;
+    const newBoard = board.map(row => [...row]);
 
-    // After placing ship, mark it as placed
-    setPlacedShips(prevState => ({ ...prevState, [ship]: true }));
-  
-    setGameState((prevState) => ({
-      ...prevState,
-      playerBoard: isPlayerBoard ? newBoard : prevState.playerBoard,
-      computerBoard: isPlayerBoard ? prevState.computerBoard : newBoard,
-      availableShips: newAvailableShips,
-    }));
-    };
+    if (isVertical && row + shipSize <= 10) {
+        for (let i = 0; i < shipSize; i++) {
+            if (board[row + i][col] !== 0) {
+                return null;
+            }
+        }
+
+        for (let i = 0; i < shipSize; i++) {
+            newBoard[row + i][col] = 1;
+        }
+    } else if (!isVertical && col + shipSize <= 10) {
+        for (let i = 0; i < shipSize; i++) {
+            if (board[row][col + i] !== 0) {
+                return null;
+            }
+        }
+
+        for (let i = 0; i < shipSize; i++) {
+            newBoard[row][col + i] = 1;
+        }
+    } else {
+        return null;
+    }
+
+    return newBoard;
+}, [ships]);
+
+
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
@@ -131,13 +130,39 @@ export default function Game() {
     Destroyer: false,
   });  
 
-  // Checking if all ships have been placed
+  // Function for placing computer ships
+  const placeComputerShips = useCallback(() => {
+    setGameState((prevState) => {
+      let newComputerBoard = [...prevState.computerBoard];
+      let newComputerShips = { ...prevState.computerShips };
+  
+      while (Object.values(newComputerShips).some(count => count > 0)) {
+        const shipTypes = Object.keys(newComputerShips).filter(ship => newComputerShips[ship as keyof typeof newComputerShips] > 0);
+        const ship = shipTypes[Math.floor(Math.random() * shipTypes.length)] as keyof typeof ships;
+        const isVertical = Math.random() > 0.5;
+        const row = Math.floor(Math.random() * (isVertical ? 10 - ships[ship] + 1 : 10));
+        const col = Math.floor(Math.random() * (isVertical ? 10 : 10 - ships[ship] + 1));
+  
+        const newBoard = placeShip(newComputerBoard, ship, row, col, isVertical);
+  
+        if (newBoard !== null) {
+          newComputerBoard = newBoard;
+          newComputerShips[ship] -= 1;
+        }
+      }
+  
+      return {
+        ...prevState,
+        computerBoard: newComputerBoard,
+        computerShips: newComputerShips,
+      };
+    });
+  }, [placeShip, ships]);  
+
   useEffect(() => {
-    const allShipsPlaced = Object.values(gameState.availableShips).every(count => count === 0);
-    if (allShipsPlaced) {
-      setCountdown(3);
-    }
-  }, [gameState.availableShips]);
+    placeComputerShips();
+}, [placeComputerShips]);
+  
 
   // Starting the countdown
   useEffect(() => {
@@ -172,57 +197,69 @@ export default function Game() {
     }
   }, [gameState.availableShips]);
 
-// Function to handle player attack
-const handlePlayerAttack = (row: number, col: number) => {
-  if (gameState.currentPlayer !== "player" || gameState.gameOver || gameState.computerBoard[row][col] > 1) {
-    return;
-  }
-  
-  const newComputerBoard = [...gameState.computerBoard];
-  const newState = { ...gameState };
-  if (newComputerBoard[row][col] === 1) { // Hit
-    newComputerBoard[row][col] = 2;
-  } else if (newComputerBoard[row][col] === 0) { // Miss
-    newComputerBoard[row][col] = 3;
-  }
+  // Function to handle player attack
+  const handlePlayerAttack = (row: number, col: number) => {
+    if (gameState.currentPlayer !== "player" || gameState.gameOver || gameState.computerBoard[row][col] > 1 || countdown !== null && countdown > 0) {
+      return;
+    }
+    
+    const newComputerBoard = [...gameState.computerBoard];
+    const newState = { ...gameState };
+    if (newComputerBoard[row][col] === 1) { // Hit
+      newComputerBoard[row][col] = 2;
+    } else if (newComputerBoard[row][col] === 0) { // Miss
+      newComputerBoard[row][col] = 3;
+    }
 
-  newState.computerBoard = newComputerBoard;
-  newState.currentPlayer = "computer";
-  
-  setGameState(newState);
+    newState.computerBoard = newComputerBoard;
+    newState.currentPlayer = "computer";
+    
+    setGameState(newState);
 
-  setTimeout(() => handleComputerAttack(), 1000);
-};
+    if (allShipsSunk(gameState.computerBoard)) {
+      setGameState(prevState => ({
+        ...prevState,
+        gameOver: true,
+      }));
+    }
 
+    setTimeout(() => handleComputerAttack(), 1000);
+  };
 
+  // Function to handle computer attack
+  const handleComputerAttack = useCallback(() => {
+    console.log('Computer is taking its turn.');
 
+    let newState = {...gameState};
+    if (newState.currentPlayer !== "computer" || newState.gameOver) return;
 
-// Function to handle computer attack
-const handleComputerAttack = useCallback(() => {
-  console.log('Computer is taking its turn.');
+    let newPlayerBoard = [...newState.playerBoard];
+    let row, col, hit;
+    do {
+      row = Math.floor(Math.random() * 10);
+      col = Math.floor(Math.random() * 10);
+      hit = newPlayerBoard[row][col];
+    } while (hit > 1); // Keeps finding if the cell has already been attacked
 
-  let newState = {...gameState};
-  if (newState.currentPlayer !== "computer" || newState.gameOver) return;
+    if (hit === 1) { // Hit
+      newPlayerBoard[row][col] = 2;
+    } else if (hit === 0) { // Miss
+      newPlayerBoard[row][col] = 3;
+    }
 
-  let newPlayerBoard = [...newState.playerBoard];
-  let row, col, hit;
-  do {
-    row = Math.floor(Math.random() * 10);
-    col = Math.floor(Math.random() * 10);
-    hit = newPlayerBoard[row][col];
-  } while (hit > 1); // Keeps finding if the cell has already been attacked
+    newState.playerBoard = newPlayerBoard;
 
-  if (hit === 1) { // Hit
-    newPlayerBoard[row][col] = 2;
-  } else if (hit === 0) { // Miss
-    newPlayerBoard[row][col] = 3;
-  }
+    if (allShipsSunk(gameState.playerBoard)) {
+      setGameState(prevState => ({
+        ...prevState,
+        gameOver: true,
+      }));
+    }
 
-  newState.playerBoard = newPlayerBoard;
-  newState.currentPlayer = "player";
-  setGameState(newState);
+    newState.currentPlayer = "player";
+    setGameState(newState);
 
-}, [gameState]);
+  }, [gameState]);
 
   useEffect(() => {
     if (gameState.currentPlayer === "computer" && !gameState.gameOver) {
@@ -230,9 +267,11 @@ const handleComputerAttack = useCallback(() => {
     }
   }, [gameState, handleComputerAttack]);
 
-
-
-
+  // Function for checking if a side has won
+  const allShipsSunk = (board: number[][]) => {
+    return !board.some(row => row.includes(1));  // Returns true if no cell contains 1 (a ship)
+  };
+  
   return (
     <main style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100vh' }}>
       {!gameStarted && <h1>Welcome to the Battleship game!</h1>}
@@ -277,13 +316,13 @@ const handleComputerAttack = useCallback(() => {
                 onMouseEnter={() => {
                   if (
                     Object.values(placedShips).every(val => val) ||
-                    (currentShip && placedShips[currentShip as keyof typeof placedShips])
+                    (currentShip && (placedShips[currentShip as keyof typeof placedShips] || gameState.availableShips[currentShip] <= 0))
                   ) {
                     setHoveredCell({ row: -1, col: -1 });
                   } else {
                     setHoveredCell({ row: i, col: j });
                   }
-                }}
+                }}                
                 onMouseLeave={() => {
                   if (
                     !Object.values(placedShips).every(val => val) &&
@@ -292,7 +331,26 @@ const handleComputerAttack = useCallback(() => {
                     setHoveredCell({ row: -1, col: -1 });
                   }
                 }}                
-                onClick={() => currentShip && placeShip(true, currentShip, i, j, isVertical)}
+                onClick={() => {
+                  if (currentShip && !shipsPlaced) {
+                    const newBoard = placeShip(gameState.playerBoard, currentShip, i, j, isVertical);
+                    if (newBoard) {
+                      setGameState(prevState => ({
+                        ...prevState,
+                        playerBoard: newBoard,
+                        availableShips: {
+                          ...prevState.availableShips,
+                          [currentShip]: prevState.availableShips[currentShip] - 1
+                        }
+                      }));
+                    }
+                    
+                    // Check if all ships have been placed
+                    if (Object.values(gameState.availableShips).every(val => val === 0)) {
+                      setShipsPlaced(true);
+                    }
+                  }
+                }}
               >
                 {cell === 2 ? 'X' : ''}
               </button>
@@ -352,7 +410,7 @@ const handleComputerAttack = useCallback(() => {
         ))}
         
       </div>
-}
-    </main>
+  }
+  </main>
   );
-    }
+}

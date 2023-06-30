@@ -6,13 +6,14 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+  --font-family: Arial, sans-serif; /* Set a font here */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --background-start-rgb: 105, 105, 105; /* Make the backdrop grey */
+    --background-end-rgb: 70, 70, 70; /* Make the backdrop grey */
   }
 }
 
@@ -24,4 +25,15 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+  font-family: var(--font-family);
+  line-height: 1.6; /* Add some line height for better readability */
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.fadeOut {
+  animation: fadeOut 3s forwards;
 }

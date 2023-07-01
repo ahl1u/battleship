@@ -50,31 +50,7 @@ export default function Game() {
       submarine: number;
       destroyer: number;
     };
-  }
-
-  const initialGameState: GameState = {
-    playerBoard: Array(10).fill(null).map(() => Array(10).fill(0)),
-    computerBoard: Array(10).fill(null).map(() => Array(10).fill(0)),
-    availableShips: {
-      carrier: 1,
-      battleship: 1,
-      cruiser: 1,
-      submarine: 1,
-      destroyer: 1,
-    },
-    computerShips: {
-      carrier: 1,
-      battleship: 1,
-      cruiser: 1,
-      submarine: 1,
-      destroyer: 1,
-    },
-    currentPlayer: "player",
-    gameOver: false,
-    playerScore: 0,
-    computerScore: 0,
-    round: 1,
-  };  
+  } 
 
   const [currentShip, setCurrentShip] = useState<keyof typeof ships | null>(null);
 
@@ -350,23 +326,59 @@ export default function Game() {
       return () => clearTimeout(timeoutId); 
     }
   }, [gameStarted, shipsPlaced, countdown]);
+
+  // Functionality for restarting
+  const resetGame = () => {
+    setGameStarted(false);
+    setShipsPlaced(false);
+    setCurrentShip(null);
+    setCountdown(null);
+
+    setGameState({
+      playerBoard: Array(10).fill(null).map(() => Array(10).fill(0)),
+      computerBoard: Array(10).fill(null).map(() => Array(10).fill(0)),
+      availableShips: {
+        carrier: 1,
+        battleship: 1,
+        cruiser: 1,
+        submarine: 1,
+        destroyer: 1,
+      },
+      computerShips: {
+        carrier: 1,
+        battleship: 1,
+        cruiser: 1,
+        submarine: 1,
+        destroyer: 1,
+      },
+      currentPlayer: "player",
+      gameOver: false,
+      playerScore: 0,
+      computerScore: 0,
+      round: 1,
+
+    });
+    startGame();
+  };  
+
+  
   
   
   return (
     <main style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100vh', backdropFilter: shipsPlacedMessageVisible || countdownMessageVisible ? 'blur(8px)' : 'none' }}>
-        {!gameStarted && <h1>Welcome to the Battleship game!</h1>}
+        {!gameStarted && <h1 className="welcome-message">Welcome to Battleship!</h1>}
         {!gameStarted ? (
-          <button onClick={startGame} style={{ fontSize: '2em' }}>Get Started</button>
+          <button className="start-button" onClick={startGame} style={{ fontSize: '2em' }}>Get Started</button>
         ) : (
           <>
             {!shipsPlaced && (
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: shipsPlacedMessageVisible ? 1 : 0, transition: 'opacity 0.5s' }}>
-                <h2 style={{ fontSize: '3em', zIndex: 9999, color: '#000000' }}>Place your ships!</h2>
-              </div>            
+              <div className={`ships-placed-message ${shipsPlacedMessageVisible ? 'visible' : ''}`}>
+                <h2>Place your ships!</h2>
+              </div>          
             )}
             {shipsPlaced && countdown !== null && countdown > 0 && (
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <h2 style={{ fontSize: '5em', zIndex: 9999, color: '#fc0303' }}>Game starts in: {countdown}</h2>
+              <div className="countdown-message">
+                <h2>Game starts in: {countdown}</h2>
               </div>
             )}
           </>
@@ -375,6 +387,43 @@ export default function Game() {
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
   
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div>Computer Board</div>
+              <div style={{ display: 'grid', gridTemplate: 'repeat(11, 1fr) / repeat(11, 1fr)' }}>
+                <div></div>
+                {Array.from({ length: 10 }, (_, i) => String.fromCharCode(i + 65)).map((letter, i) => (
+                  <div key={i}>{letter}</div>
+                ))}
+                {gameState.computerBoard.map((row, i) => (
+                  <React.Fragment key={i}>
+                    <div>{i + 1}</div>
+                    {row.map((cell, j) => (
+                        <button
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          border: '1px solid grey',
+                          backgroundColor:
+                            cell === 2 ? 'red' : // Hit ship
+                            cell === 3 ? 'blue' : // Missed hit
+                            'white', // Sea
+                        }}
+                        key={j}
+                        onClick={() => {
+                          if (shipsPlaced) {
+                            handlePlayerAttack(i, j);
+                          }
+                        }}
+                      >
+                        {cell === 2 ? 'X' : ''}
+                      </button>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </div>
+          
+          <div style={{ height: '50px' }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div>Player Board</div>
           <div style={{ display: 'grid', gridTemplate: 'repeat(11, 1fr) / repeat(11, 1fr)' }}>
             {/* Labels */}
@@ -449,78 +498,44 @@ export default function Game() {
               </React.Fragment>
             ))}
           </div>
-
-          <div style={{ height: '50px' }} />
-
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div>Computer Board</div>
-              <div style={{ display: 'grid', gridTemplate: 'repeat(11, 1fr) / repeat(11, 1fr)' }}>
-                {/* Labels */}
-                <div></div>
-                {Array.from({ length: 10 }, (_, i) => String.fromCharCode(i + 65)).map((letter, i) => (
-                  <div key={i}>{letter}</div>
-                ))}
-                {gameState.computerBoard.map((row, i) => (
-                  <React.Fragment key={i}>
-                    <div>{i + 1}</div>
-                    {row.map((cell, j) => (
-                        <button
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          border: '1px solid grey',
-                          backgroundColor:
-                            cell === 2 ? 'red' : // Hit ship
-                            cell === 3 ? 'blue' : // Missed hit
-                            'white', // Sea
-                        }}
-                        key={j}
-                        onClick={() => handlePlayerAttack(i, j)}
-                      >
-                        {cell === 2 ? 'X' : ''}
-                      </button>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </div>
             </div>
         </div>
       </div>
     }
-    {gameStarted && !shipsPlaced &&
-        <div style={{ position: 'absolute', right: 25, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <h2>Available Ships:</h2>
-          {Object.entries(gameState.availableShips).map(([ship, count]) => (
-            <div key={ship}>
-              <button
-                onClick={() => setCurrentShip(ship as keyof typeof ships)}
-                disabled={count <= 0}
-              >
-                {ship} ({count})
-              </button>
-            </div>
-          ))}
-          
-        </div>
-    }
+    {gameStarted && !shipsPlaced && (
+      <div className="available-ships">
+        <h2>Available Ships(R)</h2>
+        {Object.entries(gameState.availableShips).map(([ship, count]) => (
+          <div key={ship}>
+            <button
+              onClick={() => setCurrentShip(ship as keyof typeof ships)}
+              disabled={count <= 0}
+              className={count <= 0 ? 'used' : ''}
+            >
+              {ship}
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
     {gameState.gameOver && (
-  <div style={{
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100vh',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    backdropFilter: 'blur(8px)'
-  }}>
-    <h2 style={{ fontSize: '3em', color: '#333' }}>{winner === 'Player' ? 'You won!' : 'You lost!'}</h2>
-  </div>
-)}
-
-
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100vh',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.5)',
+      backdropFilter: 'blur(8px)'
+    }}>
+      <h2 style={{ fontSize: '3em', color: '#333' }}>{winner === 'Player' ? 'You won!' : 'You lost!'}</h2>
+      <button onClick={resetGame}>Reset Game</button>
+      
+    </div>
+  )}
   </main>
   );
 }

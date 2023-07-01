@@ -1,12 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
-  --font-family: Arial, sans-serif; /* Set a font here */
+  --font-family: Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +15,7 @@
 
 body {
   color: rgb(var(--foreground-rgb));
+  overflow: hidden;
   background: linear-gradient(
       to bottom,
       transparent,
@@ -36,4 +33,110 @@ body {
 
 .fadeOut {
   animation: fadeOut 3s forwards;
+}
+
+.welcome-message {
+  font-family: 'Impact', sans-serif;
+  font-size: 2rem;
+  padding-bottom: 7.5px;
+}
+
+.start-button {
+  font-family: 'Stencil', sans-serif;
+  font-size: 2rem;
+  border: 2px solid black;
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: black;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  padding-top: 5px;
+}
+
+.start-button:hover {
+  background-color: black;
+  color: white;
+}
+
+.ships-placed-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.ships-placed-message.visible {
+  opacity: 1;
+}
+
+.ships-placed-message h2 {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 3em;
+  color: #000000;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.countdown-message {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.countdown-message h2 {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 4em;
+  color: #fc0303;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+}
+
+/* Available Ships */
+.available-ships {
+  position: absolute;
+  right: 25px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.available-ships h2 {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 2em;
+  color: #000000;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  margin-bottom: 0px;
+}
+
+.available-ships button {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 1.5em;
+  padding: 10px 30px;
+  margin-bottom: 10px;
+  border: none;
+  background-color: #000000;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  flex: 1;
+  width: 250px;
+}
+
+.available-ships button.used {
+  background-color: #888888;
+  cursor: not-allowed;
+}
+
+
+.available-ships button:hover {
+  background-color: #333333;
 }

@@ -171,8 +171,6 @@ export default function Game() {
   useEffect(() => {
     placeComputerShips();
 }, [placeComputerShips]);
-  
-
 
   // Intro messages
   const [countdownMessageVisible, setCountdownMessageVisible] = useState(false);
@@ -409,7 +407,7 @@ export default function Game() {
     placeComputerShips();
   };  
   
-  
+
   return (
     <main style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100vh', backdropFilter: shipsPlacedMessageVisible || countdownMessageVisible ? 'blur(8px)' : 'none' }}>
         {!gameStarted && <h1 className="welcome-message">Welcome to Battleship!</h1>}

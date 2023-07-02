@@ -26,6 +26,9 @@ export default function Game() {
     playerScore: 0,
     computerScore: 0,
     round: 1,
+    targetList: [], // added
+    lastHuntCell: [0, -1], // added
+    isHunting: false, // added
   });
 
   interface GameState {
@@ -50,7 +53,11 @@ export default function Game() {
       submarine: number;
       destroyer: number;
     };
+    targetList: Array<[number, number]>; // added
+    lastHuntCell: [number, number]; // added
+    isHunting: boolean; // added
   } 
+  
 
   const [currentShip, setCurrentShip] = useState<keyof typeof ships | null>(null);
 
@@ -170,8 +177,6 @@ export default function Game() {
   // Intro messages
   const [countdownMessageVisible, setCountdownMessageVisible] = useState(false);
   const [shipsPlacedMessageVisible, setShipsPlacedMessageVisible] = useState(false);
-  const [dummyState, setDummyState] = useState(false);
-
 
   const startGame = () => {
     setGameStarted(true);
@@ -224,14 +229,14 @@ export default function Game() {
       }
   }, [countdown]);
   
-
-
-
-
-
   // Function to handle player attack
   const handlePlayerAttack = (row: number, col: number) => {
-    if (gameState.currentPlayer !== "player" || gameState.gameOver || gameState.computerBoard[row][col] > 1 || countdown !== null && countdown > 0) {
+    if (
+      gameState.currentPlayer !== "player" ||
+      gameState.gameOver ||
+      gameState.computerBoard[row][col] > 1 ||
+      countdown !== null && countdown > 0
+    ) {
       return;
     }
     
@@ -242,56 +247,90 @@ export default function Game() {
     } else if (newComputerBoard[row][col] === 0) { // Miss
       newComputerBoard[row][col] = 3;
     }
-
+  
     newState.computerBoard = newComputerBoard;
     newState.currentPlayer = "computer";
-    
+  
     setGameState(newState);
-
-    if (allShipsSunk(gameState.computerBoard)) {
+  
+    if (allShipsSunk(newComputerBoard)) {
       setGameState(prevState => ({
         ...prevState,
         gameOver: true,
       }));
+    } else {
+      setTimeout(() => handleComputerAttack(), 1000);
     }
-
-    setTimeout(() => handleComputerAttack(), 1000);
   };
 
-  // Function to handle computer attack
+  // Computer attack function using the Hunt/Target Algorithm
   const handleComputerAttack = useCallback(() => {
     console.log('Computer is taking its turn.');
-
+  
+    // Helper functions for Hunt algo
+    const getNextHuntCell = (lastHuntCell: [number, number]) => {
+      let [lastRow, lastCol] = lastHuntCell;
+    
+      // Randomly select the next quadrant to attack
+      const randomQuadrant = Math.floor(Math.random() * 4);
+    
+      // Determine the starting cell based on the selected quadrant
+      let rowStart = randomQuadrant <= 1 ? 0 : 5;
+      let rowEnd = randomQuadrant <= 1 ? 4 : 9;
+      let colStart = randomQuadrant % 2 === 0 ? 0 : 5;
+      let colEnd = randomQuadrant % 2 === 0 ? 4 : 9;
+    
+      // Randomly select a cell within the quadrant
+      lastRow = Math.floor(Math.random() * (rowEnd - rowStart + 1)) + rowStart;
+      lastCol = Math.floor(Math.random() * (colEnd - colStart + 1)) + colStart;
+    
+      return [lastRow, lastCol];
+    }
+  
+    const getAdjacentCells = (row: number, col: number, board: number[][]) => {
+      let adjacentCells: [number, number][] = [];
+      if (row > 0 && board[row-1][col] === 1) adjacentCells.push([row-1, col]);
+      if (row < 9 && board[row+1][col] === 1) adjacentCells.push([row+1, col]);
+      if (col > 0 && board[row][col-1] === 1) adjacentCells.push([row, col-1]);
+      if (col < 9 && board[row][col+1] === 1) adjacentCells.push([row, col+1]);
+      return adjacentCells;
+    }
+  
     let newState = {...gameState};
     if (newState.currentPlayer !== "computer" || newState.gameOver) return;
-
+  
     let newPlayerBoard = [...newState.playerBoard];
-    let row, col, hit;
-    do {
-      row = Math.floor(Math.random() * 10);
-      col = Math.floor(Math.random() * 10);
+    let row: number, col: number, hit: number;
+  
+    if (newState.targetList && newState.targetList.length !== 0) { // Target Phase
+      [row, col] = newState.targetList.pop() as [number, number];
       hit = newPlayerBoard[row][col];
-    } while (hit > 1); // Keeps finding if the cell has already been attacked
-
+    } else { // Hunt Phase
+      do {
+        // Get the next cell to attack in the hunt phase
+        [row, col] = getNextHuntCell(newState.lastHuntCell || [0, 0]);
+        newState.lastHuntCell = [row, col];
+        hit = newPlayerBoard[row][col];
+      } while (hit > 1); // Keeps finding if the cell has already been attacked
+    }
+  
     if (hit === 1) { // Hit
       newPlayerBoard[row][col] = 2;
+      // Add the adjacent cells to the target list
+      newState.targetList = (newState.targetList || []).concat(getAdjacentCells(row, col, newPlayerBoard));
     } else if (hit === 0) { // Miss
       newPlayerBoard[row][col] = 3;
     }
-
+  
     newState.playerBoard = newPlayerBoard;
-
-    if (allShipsSunk(gameState.playerBoard)) {
-      setGameState(prevState => ({
-        ...prevState,
-        gameOver: true,
-      }));
+  
+    if (allShipsSunk(newState.playerBoard)) {
+      newState.gameOver = true;
     }
-
+  
     newState.currentPlayer = "player";
     setGameState(newState);
-
-  }, [gameState]);
+  }, [gameState]);  
 
   useEffect(() => {
     if (gameState.currentPlayer === "computer" && !gameState.gameOver) {
@@ -307,15 +346,20 @@ export default function Game() {
 
   // Checking who actually won
   useEffect(() => {
-    const playerShipsRemaining = Object.values(gameState.availableShips).some(val => val > 0);
-    const computerShipsRemaining = Object.values(gameState.computerShips).some(val => val > 0);
-    
-    if (!computerShipsRemaining) {
+    const playerShips = Object.values(gameState.playerBoard)
+      .flat()
+      .every(cell => cell !== 1); // Check if all cells on the player board are not 1 (indicating a ship)
+  
+    const computerShips = Object.values(gameState.computerBoard)
+      .flat()
+      .every(cell => cell !== 1); // Check if all cells on the player board are not 1 (indicating a ship)
+  
+    if (playerShips && !computerShips) {
       setWinner('Player');
-    } else if (!playerShipsRemaining) {
+    } else if (!playerShips && computerShips) {
       setWinner('Computer');
     }
-  }, [gameState.availableShips, gameState.computerShips]);  
+  }, [gameState.computerBoard, gameState.playerBoard]);
 
   // Following for animations n stuff
   const [headerVisible, setHeaderVisible] = useState(true);
@@ -333,7 +377,8 @@ export default function Game() {
     setShipsPlaced(false);
     setCurrentShip(null);
     setCountdown(null);
-
+    setWinner(null);
+  
     setGameState({
       playerBoard: Array(10).fill(null).map(() => Array(10).fill(0)),
       computerBoard: Array(10).fill(null).map(() => Array(10).fill(0)),
@@ -356,19 +401,20 @@ export default function Game() {
       playerScore: 0,
       computerScore: 0,
       round: 1,
-
+      targetList: [], // added
+      lastHuntCell: [0, -1], // added
+      isHunting: false, // added
     });
     startGame();
+    placeComputerShips();
   };  
-
-  
   
   
   return (
     <main style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100vh', backdropFilter: shipsPlacedMessageVisible || countdownMessageVisible ? 'blur(8px)' : 'none' }}>
         {!gameStarted && <h1 className="welcome-message">Welcome to Battleship!</h1>}
         {!gameStarted ? (
-          <button className="start-button" onClick={startGame} style={{ fontSize: '2em' }}>Get Started</button>
+          <button className="start-button" onClick={startGame} style={{ fontFamily: 'Impact, Charcoal, sans-serif', fontSize: '2em', fontWeight: 'bold' }}>Play</button>
         ) : (
           <>
             {!shipsPlaced && (
@@ -387,7 +433,7 @@ export default function Game() {
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
   
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div>Computer Board</div>
+        <div style={{ color: '#CC0000', fontWeight: 'bold' }}>Computer Board</div>
               <div style={{ display: 'grid', gridTemplate: 'repeat(11, 1fr) / repeat(11, 1fr)' }}>
                 <div></div>
                 {Array.from({ length: 10 }, (_, i) => String.fromCharCode(i + 65)).map((letter, i) => (
@@ -424,9 +470,8 @@ export default function Game() {
           <div style={{ height: '50px' }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div>Player Board</div>
+          <div style={{ color: '#7BAFD4', fontWeight: 'bold'}}>Your Board</div>
           <div style={{ display: 'grid', gridTemplate: 'repeat(11, 1fr) / repeat(11, 1fr)' }}>
-            {/* Labels */}
             <div></div>
             {Array.from({ length: 10 }, (_, i) => String.fromCharCode(i + 65)).map((letter, i) => (
               <div key={i}>{letter}</div>
@@ -472,7 +517,7 @@ export default function Game() {
                     }
                   }}                
                   onClick={() => {
-                    if (currentShip && !shipsPlaced) {
+                    if (currentShip && !shipsPlaced && gameState.availableShips[currentShip] > 0) {
                       const newBoard = placeShip(gameState.playerBoard, currentShip, i, j, isVertical);
                       if (newBoard) {
                         setGameState(prevState => ({
@@ -486,7 +531,8 @@ export default function Game() {
                       }
                       
                       // Check if all ships have been placed
-                      if (Object.values(gameState.availableShips).every(val => val === 0)) {
+                      const allShipsPlaced = Object.values(gameState.availableShips).every(val => val === 0);
+                      if (allShipsPlaced) {
                         setShipsPlaced(true);
                       }
                     }
@@ -519,22 +565,12 @@ export default function Game() {
       </div>
     )}
     {gameState.gameOver && (
-    <div style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100vh',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.5)',
-      backdropFilter: 'blur(8px)'
-    }}>
-      <h2 style={{ fontSize: '3em', color: '#333' }}>{winner === 'Player' ? 'You won!' : 'You lost!'}</h2>
-      <button onClick={resetGame}>Reset Game</button>
-      
-    </div>
+    <div className="game-over-overlay">
+    <h2 style={{ fontSize: '3em', color: '#333' }}>{winner === 'Player' ? 'You Lost!' : 'You Won!'}</h2>
+    <button className="reset-button" onClick={resetGame}>
+      Reset Game
+    </button>
+  </div>
   )}
   </main>
   );
